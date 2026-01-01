@@ -127,9 +127,13 @@ export const DNSRecordManager: React.FC<DNSRecordManagerProps> = ({ zone }) => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {record.proxied ? (
-                    <Cloud className="h-5 w-5 text-orange-500" title="已代理" />
+                    <div title="已代理">
+                      <Cloud className="h-5 w-5 text-orange-500" />
+                    </div>
                   ) : (
-                    <CloudOff className="h-5 w-5 text-gray-400" title="仅 DNS" />
+                    <div title="仅 DNS">
+                      <CloudOff className="h-5 w-5 text-gray-400" />
+                    </div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
