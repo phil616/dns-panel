@@ -5,7 +5,6 @@ const AUTH_COOKIE_KEY = 'cf_dns_auth';
 export interface AuthData {
   apiToken: string;
   email?: string; // Optional if using Bearer Token
-  proxyUrl?: string; // Optional custom proxy URL
 }
 
 export const getAuth = (): AuthData | null => {

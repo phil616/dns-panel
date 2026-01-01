@@ -1,38 +1,18 @@
 import { getAuth } from './auth';
 
-const DEV_PROXY = '/api/cloudflare';
-const DIRECT_API = 'https://api.cloudflare.com/client/v4';
+const PROXY_API = '/api/cloudflare';
 
 const getBaseUrl = () => {
-  const auth = getAuth();
-  if (auth?.proxyUrl) {
-    // Remove trailing slash if present
-    return auth.proxyUrl.replace(/\/$/, '');
-  }
-  return import.meta.env.DEV ? DEV_PROXY : DIRECT_API;
+  return PROXY_API;
 };
 
 const getHeaders = () => {
-  const auth = getAuth();
-  const headers: Record<string, string> = {
+  // In Next.js Proxy mode, the frontend does NOT send the Token in headers directly.
+  // The token is in the Cookie, which is automatically sent.
+  // We only need Content-Type.
+  return {
     'Content-Type': 'application/json',
   };
-
-  if (auth?.apiToken) {
-    // Heuristic: Global Keys are typically 37 chars hex. API Tokens are typically 40 chars.
-    // If it looks like a Global Key and email is present, use X-Auth headers.
-    // Otherwise, default to Bearer Token.
-    const isGlobalKey = auth.apiToken.length === 37 && /^[a-f0-9]+$/i.test(auth.apiToken);
-
-    if (auth.email && isGlobalKey) {
-       headers['X-Auth-Email'] = auth.email;
-       headers['X-Auth-Key'] = auth.apiToken;
-    } else {
-       headers['Authorization'] = `Bearer ${auth.apiToken}`;
-    }
-  }
-
-  return headers;
 };
 
 async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

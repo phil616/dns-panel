@@ -1,20 +1,24 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { LoginForm } from './components/LoginForm';
-import { ZoneList } from './components/ZoneList';
-import { DNSRecordManager } from './components/DNSRecordManager';
-import { getAuth, clearAuth } from './lib/auth';
-import { Zone } from './lib/api';
+import { LoginForm } from '@/components/LoginForm';
+import { ZoneList } from '@/components/ZoneList';
+import { DNSRecordManager } from '@/components/DNSRecordManager';
+import { getAuth, clearAuth } from '@/lib/auth';
+import { Zone } from '@/lib/api';
 import { LogOut } from 'lucide-react';
 
-function App() {
+export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const auth = getAuth();
     if (auth) {
       setIsAuthenticated(true);
     }
+    setLoading(false);
   }, []);
 
   const handleLogin = () => {
@@ -28,6 +32,10 @@ function App() {
       setSelectedZone(null);
     }
   };
+
+  if (loading) {
+      return <div className="min-h-screen flex items-center justify-center">加载中...</div>;
+  }
 
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} />;
@@ -71,5 +79,3 @@ function App() {
     </div>
   );
 }
-
-export default App;

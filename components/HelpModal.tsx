@@ -79,29 +79,21 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           <section>
             <div className="flex items-center mb-4">
               <Network className="h-6 w-6 text-purple-600 mr-2" />
-              <h4 className="text-lg font-semibold text-gray-800">如何与 Cloudflare 交互</h4>
+              <h4 className="text-lg font-semibold text-gray-800">关于网络交互</h4>
             </div>
             <div className="text-sm text-gray-600 space-y-2 pl-8">
               <p>
-                由于浏览器的安全策略（CORS），网页前端无法直接访问 Cloudflare API。因此我们需要一个“中间人”来转发请求。
+                本应用直接从您的浏览器向 Cloudflare API 发起请求，不经过任何中间服务器。
               </p>
               <div className="bg-gray-50 p-4 rounded-md border border-gray-200 mt-2">
                 <h5 className="font-medium text-gray-900 mb-2">架构原理</h5>
                 <p className="mb-2">
-                  前端 (浏览器) &rarr; <span className="text-purple-600 font-medium">代理 (Worker)</span> &rarr; Cloudflare API
-                </p>
-                <p className="text-xs text-gray-500">
-                  代理的作用仅仅是添加允许跨域的响应头 (Access-Control-Allow-Origin)，并原样转发您的请求和 Token。
+                  前端 (浏览器) &rarr; Cloudflare API
                 </p>
               </div>
-              <ul className="list-disc list-outside space-y-1 ml-4 mt-2">
-                <li>
-                  <strong>本地开发</strong>: 此时您不需要填写代理 URL，因为我们内置了 Vite 本地代理。
-                </li>
-                <li>
-                  <strong>生产环境</strong>: 您需要部署本项目提供的 <code>worker-proxy.js</code> 到您的 Cloudflare Workers，并将 Worker URL 填入登录框的“代理 URL”处。
-                </li>
-              </ul>
+              <p className="mt-2 text-yellow-600">
+                注意：如果遇到 CORS 跨域错误，可能是因为 Cloudflare API 对浏览器直接请求有限制。通常建议在本地开发使用，或者使用支持 CORS 的浏览器插件/配置。
+              </p>
             </div>
           </section>
         </div>
