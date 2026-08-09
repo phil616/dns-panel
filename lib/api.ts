@@ -1,6 +1,6 @@
-import { getAuth } from './auth';
-
 const PROXY_API = '/api/cloudflare';
+const ZONES_PER_PAGE = 50;
+const DNS_RECORDS_PER_PAGE = 5000;
 
 const getBaseUrl = () => {
   return PROXY_API;
@@ -15,10 +15,26 @@ const getHeaders = () => {
   };
 };
 
-async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+interface CloudflareError {
+  message?: string;
+}
+
+interface CloudflareResultInfo {
+  page?: number;
+  total_pages?: number;
+}
+
+interface CloudflareResponse<T> {
+  success: boolean;
+  result: T;
+  errors?: CloudflareError[];
+  result_info?: CloudflareResultInfo;
+}
+
+async function requestAPI<T>(endpoint: string, options: RequestInit = {}): Promise<CloudflareResponse<T>> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint}`;
-  
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -27,16 +43,48 @@ async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.errors?.[0]?.message || `API 请求错误: ${response.statusText}`);
+  const json = await response.json().catch(() => null) as CloudflareResponse<T> | null;
+
+  if (!response.ok || !json?.success) {
+    throw new Error(json?.errors?.[0]?.message || `API 请求错误: ${response.statusText || response.status}`);
   }
 
-  const json = await response.json();
-  if (!json.success) {
-     throw new Error(json.errors?.[0]?.message || '未知 API 错误');
-  }
+  return json;
+}
+
+async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const json = await requestAPI<T>(endpoint, options);
   return json.result;
+}
+
+async function fetchAllPages<T>(
+  endpoint: string,
+  perPage: number,
+  options: RequestInit = {},
+): Promise<T[]> {
+  const results: T[] = [];
+  let page = 1;
+
+  while (true) {
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const response = await requestAPI<T[]>(
+      `${endpoint}${separator}page=${page}&per_page=${perPage}`,
+      options,
+    );
+
+    results.push(...response.result);
+
+    const totalPages = response.result_info?.total_pages;
+    if (typeof totalPages === 'number') {
+      if (page >= totalPages) break;
+    } else if (response.result.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return results;
 }
 
 export interface Zone {
@@ -62,19 +110,16 @@ export interface DNSRecord {
 }
 
 export const api = {
-  getZones: async (name?: string) => {
-    const query = name ? `?name=${encodeURIComponent(name)}` : '';
-    return fetchAPI<Zone[]>(`/zones${query}`);
+  getZones: async (options: RequestInit = {}) => {
+    return fetchAllPages<Zone>('/zones', ZONES_PER_PAGE, options);
   },
 
-  getDNSRecords: async (zoneId: string, search?: string) => {
-    let query = `?per_page=100`;
-    if (search) {
-      query += `&name=${encodeURIComponent(search)}`; // Cloudflare filters by name
-      // Note: Cloudflare search is strict match or needs match=all/any. 
-      // Often simpler to just list and filter locally or use 'match=all'
-    }
-    return fetchAPI<DNSRecord[]>(`/zones/${zoneId}/dns_records${query}`);
+  getDNSRecords: async (zoneId: string, options: RequestInit = {}) => {
+    return fetchAllPages<DNSRecord>(
+      `/zones/${encodeURIComponent(zoneId)}/dns_records`,
+      DNS_RECORDS_PER_PAGE,
+      options,
+    );
   },
 
   createDNSRecord: async (zoneId: string, data: Partial<DNSRecord>) => {

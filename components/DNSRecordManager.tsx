@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { api, Zone, DNSRecord } from '../lib/api';
+import { filterDNSRecords } from '../lib/search';
 import { DNSRecordModal } from './DNSRecordModal';
 import { Plus, Search, Edit2, Trash2, Cloud, CloudOff, RefreshCw, Loader2 } from 'lucide-react';
 
@@ -13,26 +14,38 @@ export const DNSRecordManager: React.FC<DNSRecordManagerProps> = ({ zone }) => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<DNSRecord | undefined>(undefined);
-  
-  const fetchRecords = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.getDNSRecords(zone.id, search);
-      setRecords(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }, [zone.id, search]); // Re-fetch when zone or search changes
+  const [error, setError] = useState('');
+  const activeRequest = useRef(0);
 
-  // Debounce search
+  const fetchRecords = useCallback(async (signal?: AbortSignal) => {
+    const requestId = ++activeRequest.current;
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.getDNSRecords(zone.id, { signal });
+      if (requestId === activeRequest.current) setRecords(data);
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      if (requestId === activeRequest.current) {
+        setError((err as Error).message || '加载 DNS 记录失败');
+      }
+    } finally {
+      if (requestId === activeRequest.current && !signal?.aborted) setLoading(false);
+    }
+  }, [zone.id]);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRecords();
-    }, 500);
-    return () => clearTimeout(timer);
+    const controller = new AbortController();
+    setSearch('');
+    setRecords([]);
+    fetchRecords(controller.signal);
+    return () => controller.abort();
   }, [fetchRecords]);
+
+  const filteredRecords = useMemo(
+    () => filterDNSRecords(records, search),
+    [records, search],
+  );
 
   const handleAdd = () => {
     setEditingRecord(undefined);
@@ -112,7 +125,7 @@ export const DNSRecordManager: React.FC<DNSRecordManagerProps> = ({ zone }) => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {records.map((record) => (
+            {filteredRecords.map((record) => (
               <tr key={record.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
@@ -149,10 +162,17 @@ export const DNSRecordManager: React.FC<DNSRecordManagerProps> = ({ zone }) => {
                 </td>
               </tr>
             ))}
-            {!loading && records.length === 0 && (
+            {!loading && !error && filteredRecords.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-6 py-10 text-center text-gray-500 text-sm">
-                  未找到匹配的记录。
+                  {search.trim() ? '未找到匹配的记录。' : '暂无 DNS 记录。'}
+                </td>
+              </tr>
+            )}
+            {!loading && error && (
+              <tr>
+                <td colSpan={6} className="px-6 py-10 text-center text-red-500 text-sm">
+                  {error}
                 </td>
               </tr>
             )}

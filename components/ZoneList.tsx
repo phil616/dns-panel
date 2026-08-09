@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, Zone } from '../lib/api';
+import { filterZones } from '../lib/search';
 import { Search, Loader2 } from 'lucide-react';
 
 interface ZoneListProps {
@@ -13,25 +14,27 @@ export const ZoneList: React.FC<ZoneListProps> = ({ selectedZoneId, onSelectZone
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchZones();
-  }, []);
-
-  const fetchZones = async () => {
+  const fetchZones = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const data = await api.getZones();
+      setError('');
+      const data = await api.getZones({ signal });
       setZones(data);
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, []);
 
-  const filteredZones = zones.filter(z => 
-    z.name.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchZones(controller.signal);
+    return () => controller.abort();
+  }, [fetchZones]);
+
+  const filteredZones = useMemo(() => filterZones(zones, search), [zones, search]);
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200 w-64">
